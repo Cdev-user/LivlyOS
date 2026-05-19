@@ -1,0 +1,186 @@
+// ================================================================
+// Livly AI v1 – Mini Decision Engine für LivlyOS
+// ================================================================
+
+// Ordnerstruktur (empfohlen):
+// src/
+//  ├── livly AI/
+//  │    ├── livly_ai.c      <- AI Engine
+//  │    ├── livly_ai.h
+//  │    ├── ai_model.c      <- Neural-Net / gewichtete Entscheidungen
+//  │    ├── ai_model.h
+//  │    ├── srvki.c         <- Schnittstelle Kernel <-> AI
+//  │    ├── srvki.h
+
+// ================================================================
+// 1. SYSTEM DATA – vom Kernel gesammelte Infos
+// ================================================================
+
+struct system_state {
+    int cpu_usage;    // 0-100 %
+    int memory_free;  // 0-100 %
+    int task_count;   // laufende Tasks
+};
+
+// ================================================================
+// 2. AI RESPONSE – Vorschlag der KI
+// ================================================================
+
+#define AI_DO_NOTHING 0
+#define AI_OPTIMIZE   1
+#define AI_KILL_TASK  2
+
+struct ai_response {
+    int action;       // was die KI vorschlägt
+    int confidence;   // wie sicher sich die KI ist (0-100%)
+};
+
+// ================================================================
+// 3. LIVLY AI ENGINE
+// ================================================================
+
+// Simple Vergleichsfunktion (strcmp-Ersatz ohne libc)
+int strcmp(const char* a, const char* b) {
+    int i = 0;
+    while (a[i] && b[i]) {
+        if (a[i] != b[i])
+            return 0;
+        i++;
+    }
+    return a[i] == b[i];
+}
+
+// Decision Engine – nimmt Systemstatus, gibt Vorschlag
+struct ai_response ai_decision(struct system_state state) {
+    struct ai_response res;
+
+    // Beispiel: linear gewichtet
+    float score = state.cpu_usage * 0.5f +
+                  (100 - state.memory_free) * 0.3f +
+                  state.task_count * 0.2f;
+
+    if (score > 70) {
+        res.action = AI_KILL_TASK;
+        res.confidence = 90;  // sehr sicher
+    } else if (score > 40) {
+        res.action = AI_OPTIMIZE;
+        res.confidence = 70;  // mittel sicher
+    } else {
+        res.action = AI_DO_NOTHING;
+        res.confidence = 100; // sicher, dass nichts getan werden muss
+    }
+
+    return res;
+}
+
+// ================================================================
+// 4. SRVKI – Schnittstelle Kernel <-> AI
+// ================================================================
+
+struct ai_response srvki_handle(struct system_state state) {
+    // Hier kann man später Training/Updates einbauen
+    return ai_decision(state);
+}
+
+// ================================================================
+// 5. KERNEL – Prüfung & Ausführung
+// ================================================================
+
+void kernel_process_ai(struct system_state state) {
+    struct ai_response res = srvki_handle(state);
+
+    // Safety Layer: Kernel entscheidet, ob Aktion ausgeführt wird
+    switch(res.action) {
+        case AI_KILL_TASK:
+            if (res.confidence > 80 && state.memory_free < 10) {
+                // Kernel überprüft, ob Task wirklich beendet werden kann
+                // kill_task(task); <- implementiere deine Task-Logik hier
+            }
+            break;
+        case AI_OPTIMIZE:
+            if (res.confidence > 60) {
+                // z.B. Prioritäten anpassen
+                // optimize_tasks(); <- implementiere eigene Optimierung
+            }
+            break;
+        case AI_DO_NOTHING:
+        default:
+            // keine Aktion nötig
+            break;
+    }
+}
+
+// ================================================================
+// 6. TRAINING / WEIGHTS UPDATE
+// ================================================================
+
+// Für Mini Neural Net oder gewichtete AI:
+// - Auf PC offline trainieren (z.B. Python, kleine Datensätze)
+// - Ergebnisse exportieren: z.B. float weights[3] = {...}
+// - In ai_model.c einfügen
+// - Kernel liest beim Start die Gewichtungen
+// - KI arbeitet deterministisch -> Debugging wird einfach
+
+// Beispiel Gewichtungen:
+float weights[3] = {0.5f, 0.3f, 0.2f};
+
+// Trainingslogik (außerhalb des OS):
+// 1. Datensätze erstellen: CPU, Memory, Tasks, gewünschte Aktion
+// 2. Mini-Net trainieren (Python/Numpy)
+// 3. Gewichte exportieren
+// 4. In ai_model.c einfügen
+
+
+
+Optimierungen etc.
+1️⃣ Whitelist / erlaubte Aktionen
+Definiere explizit, welche Aktionen die KI vorschlagen darf.
+Kernel prüft, ob die vorgeschlagene Aktion auf der Whitelist steht.
+
+Beispiel:
+
+int is_allowed_action(int action) {
+    switch(action) {
+        case AI_DO_NOTHING:
+        case AI_OPTIMIZE:
+        case AI_KILL_TASK:
+            return 1;
+        default:
+            return 0; // alles andere blocken
+    }
+}
+2️⃣ Input Validation
+Der Kernel prüft die Systemdaten, bevor die KI sie verarbeitet.
+So kann die KI nicht durch „komische“ Daten zu gefährlichen Entscheidungen kommen.
+
+Beispiel:
+
+if (state.memory_free < 0) state.memory_free = 0;
+if (state.cpu_usage > 100) state.cpu_usage = 100;
+3️⃣ Aktionslimits / Rate Limiting
+Bestimme wie oft oder wie viele Aktionen pro Zeitfenster erlaubt sind.
+Beispiel: Maximal 1 Task pro Sekunde killen.
+static int last_kill_time = 0;
+if (res.action == AI_KILL_TASK && current_time - last_kill_time > 1000) {
+    kill_task();
+    last_kill_time = current_time;
+}
+4️⃣ Redundanz / Voting-System
+Du könntest mehrere kleine AIs oder Module haben, die alle den Vorschlag prüfen.
+Nur wenn z. B. 2/3 dasselbe vorschlagen, wird die Aktion ausgeführt.
+5️⃣ Safety Thresholds
+Neben Confidence noch absolute Limits prüfen.
+Beispiel: Memory darf nie unter 5 % fallen, CPU nie über 95 % belastet werden, egal was die KI sagt.
+if (state.memory_free < 5) {
+    res.action = AI_DO_NOTHING; // override KI
+}
+6️⃣ Simulationsmodus
+Bevor eine Aktion wirklich ausgeführt wird, simulieren, was passieren würde.
+Kernel kann prüfen, ob es zu einem Crash oder unerwünschtem Zustand führen könnte.
+7️⃣ Logging & Review
+Jede KI-Aktion wird geloggt.
+Später kannst du analysieren, ob KI fehlerhafte Vorschläge gemacht hat.
+
+
+
+
