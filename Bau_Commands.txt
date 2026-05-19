@@ -1,1 +1,0 @@
-"/c/Program Files/Oracle/VirtualBox/VBoxManage.exe" convertfromraw build/disk.img build/livlyOs2.9.6[Multi].vdi --format VDI
