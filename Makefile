@@ -176,7 +176,7 @@ build/disk.img: build/stage1.bin build/stage2.bin build/BOOTX64.EFI build/kernel
 	dd if=build/stage1.bin of=$@ bs=1 count=446 conv=notrunc status=none
 	dd if=build/stage2.bin of=$@ bs=512 seek=34 conv=notrunc status=none
 	dd if=build/kernel.bin of=$@ bs=512 seek=$(KERNEL_SECTOR) conv=notrunc status=none
-	@echo ">>> Multiboot Disk fertig (BIOS + UEFI)"
+	@echo ">>> Disk image created successfully"
 
 # ─── Clean ────────────────────────────────────────────────
 clean:
