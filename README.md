@@ -31,8 +31,15 @@ Prerequisites:
 Build the disk image:
 
 ```bash
-make
+make all 
 ```
+Build the vdi image for VM:
+
+```bash
+"/c/Program Files/Oracle/VirtualBox/VBoxManage.exe" convertfromraw build/disk.img build/livlyOs.vdi --format VDI
+```
+The file VBoxManage.exe may lies in a other path.
+
 
 Clean build artifacts:
 
